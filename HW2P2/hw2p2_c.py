@@ -18,13 +18,6 @@ import wandb
 import matplotlib.pyplot as plt
 #from pytorch_metric_learning import samplers
 import csv
-# from torchvision.transforms import v2
-# from pytorch_metric_learning import losses
-# !mkdir '/content/data'
-
-# !kaggle competitions download -c 11785-hw-2-p-2-face-verification-fall-2024
-# !unzip -qo '11785-hw-2-p-2-face-verification-fall-2024.zip' -d '/content/data'
-
 
 from metric import AverageMeter
 from network import ConvNeXt
@@ -45,7 +38,7 @@ run_name = f"yiyan_run{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 config = {
     'batch_size'    : 1024, # Increase this if your GPU can handle it
     'init_lr'       : 0.01, # 1e-2 for pretrain
-    'epochs'        : 20, # 20 epochs is recommended ONLY for the early submission - you will have to train for much longer typically.
+    'epochs'        : 200, # 20 epochs is recommended ONLY for the early submission - you will have to train for much longer typically.
     'data_dir'      : "/ihome/hkarim/yip33/HW2P2/data/11-785-f24-hw2p2-verification/cls_data", #TODO
     'data_ver_dir'  : "/ihome/hkarim/yip33/HW2P2/data/11-785-f24-hw2p2-verification/ver_data", #TODO
     'checkpoint_dir': f"./checkpoints/{run_name}",
@@ -181,7 +174,7 @@ It is highly recommended that you visualize your data augmentation as sanity che
 
 
 #from network import ConvNeXtPreTrained
-from network import ResNet34, ResNet50
+from network import ResNet34
 #model = ConvNeXtPreTrained(num_classes=8631).to(DEVICE)
 # model = ConvNeXt(num_classes=8631, drop_path_rate=0.1).to(DEVICE)
 #model = ConvNeXt(num_classes = 8631).to(DEVICE)
@@ -282,7 +275,6 @@ def get_ver_metrics(labels, scores, FPRs):
     }
 
 def cutmix_data(images, labels, alpha=1.0):
-    ''' Returns mixed inputs, pairs of targets, and lambda '''
     lam = np.random.beta(alpha, alpha)
     rand_index = torch.randperm(images.size()[0]).to(images.device)
     target_a = labels
@@ -294,14 +286,12 @@ def cutmix_data(images, labels, alpha=1.0):
     return images, target_a, target_b, lam
 
 def rand_bbox(size, lam):
-    '''Generates random bounding box'''
     W = size[2]
     H = size[3]
     cut_rat = np.sqrt(1. - lam)
-    cut_w = int(W * cut_rat)  # Replaced np.int with int
-    cut_h = int(H * cut_rat)  # Replaced np.int with int
+    cut_w = int(W * cut_rat)  
+    cut_h = int(H * cut_rat)  
 
-    # Uniformly sample the bounding box center
     cx = np.random.randint(W)
     cy = np.random.randint(H)
 
@@ -313,7 +303,6 @@ def rand_bbox(size, lam):
     return bbx1, bby1, bbx2, bby2
 
 def mixup_data(x, y, alpha=1.0):
-    '''Compute the mixup data. Return mixed inputs, pairs of targets, and lambda'''
     if alpha > 0:
         lam = np.random.beta(alpha, alpha)
     else:
@@ -325,20 +314,6 @@ def mixup_data(x, y, alpha=1.0):
     y_a, y_b = y, y[index]
     return mixed_x, y_a, y_b, lam
 
-
-# class LogitLayer(torch.nn.Module):
-#     def __init__(self, embedding_size, num_classes):
-#         super(LogitLayer, self).__init__()
-#         # A fully connected layer that maps embeddings to logits
-#         self.fc = torch.nn.Linear(embedding_size, num_classes)
-
-#     def forward(self, features):
-#         # Features from the model's output (embedding)
-#         features = F.normalize(features, p=2, dim=1)
-#         logits = self.fc(features)  # This outputs logits of shape [batch_size, num_classes]
-#         return logits
-
-# logit_layer = LogitLayer(embedding_size=512, num_classes=8631).to(DEVICE)
 
 
 
@@ -365,13 +340,12 @@ def train_epoch(model, dataloader, optimizer, lr_scheduler, scaler, device, conf
         else:
             labels = labels.to(device, non_blocking=True)
 
-        # Apply CutMix with a probability of 50%
+        # cutMix and mixup with a probability of 50%
         if np.random.rand(1) < 0.5:
             images, targets_a, targets_b, lam = cutmix_data(images, labels, alpha=1.0)
         else:
             images, targets_a, targets_b, lam = mixup_data(images, labels, alpha=1.0)
 
-            #images, targets_a, targets_b, lam = cutmix_data(images, labels, alpha=1.0)
         targets_a, targets_b = targets_a.to(device), targets_b.to(device)
 
             # Forward pass with mixed images
@@ -379,15 +353,10 @@ def train_epoch(model, dataloader, optimizer, lr_scheduler, scaler, device, conf
             outputs = model(images)
             out = outputs['out']
 
-                # Compute the loss as a combination of the two labels
+                #  loss as a combination of the two labels
             loss = lam * criterion(out, targets_a) + (1 - lam) * criterion(out, targets_b)
 
 
-            #     outputs = model(images)
-
-            #     # Use the type of output depending on the loss function you want to use
-            
-            #     #loss = criterion(outputs['out'], labels)
         scaler.scale(loss).backward() # This is a replacement for loss.backward()
         scaler.step(optimizer) # This is a replacement for optimizer.step()
         scaler.update()
@@ -648,7 +617,6 @@ def test_epoch_ver(model, pair_data_loader, config):
     return scores
 
 scores = test_epoch_ver(model, test_pair_dataloader, config)
-
 
 
 with open(f"verification_convnext_{run_name}.csv", "w+") as f:

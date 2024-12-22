@@ -43,7 +43,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 config = {
     'batch_size'    : 512, # Increase this if your GPU can handle it
     'init_lr'       : 0.1, # 1e-2 for pretrain
-    'epochs'        : 100, # 20 epochs is recommended ONLY for the early submission - you will have to train for much longer typically.
+    'epochs'        : 200, # 20 epochs is recommended ONLY for the early submission - you will have to train for much longer typically.
     'data_dir'      : "/ihome/hkarim/yip33/HW2P2/data/11-785-f24-hw2p2-verification/cls_data", #TODO
     'data_ver_dir'  : "/ihome/hkarim/yip33/HW2P2/data/11-785-f24-hw2p2-verification/ver_data", #TODO
     'checkpoint_dir': f"./checkpoints/",
@@ -59,7 +59,7 @@ config = {
     'momentum'      : 0.9,
     # Include other parameters as needed.
 }
-from network import ResNet34, ResNet50
+from network import ResNet34
 model = ResNet34(num_classes=8631).to(DEVICE) # convext small
 
 
@@ -106,7 +106,7 @@ scores = test_epoch_ver(model, test_pair_dataloader, config)
 
 
 
-with open(f"verification_resnet34_trick.csv", "w+") as f:
+with open(f"verification_resnet34.csv", "w+") as f:
     f.write("ID,Label\n")
     for i in range(len(scores)):
         f.write("{},{}\n".format(i, scores[i]))
